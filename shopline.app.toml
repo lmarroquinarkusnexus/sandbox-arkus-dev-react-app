@@ -1,0 +1,13 @@
+
+appName = "sandbox-arkus-dev-react-app"
+appKey = "20439b05440d122cca7170784059415adf4c6e28"
+appUrl = "https://candidates-php-debian-diff.trycloudflare.com"
+appCallbackUrlList = [
+  "https://candidates-php-debian-diff.trycloudflare.com/api/auth/callback"
+]
+isNewWindow = false
+subPathPrefix = "apps"
+proxyUrl = ""
+
+[access_scopes]
+scopes = "write_products"
