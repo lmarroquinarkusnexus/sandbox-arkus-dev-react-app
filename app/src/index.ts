@@ -5,6 +5,10 @@ import { readFileSync } from 'fs';
 import serveStatic from 'serve-static';
 import { webhooksController } from './controller/webhook';
 import createProductController from './controller/product/create';
+import listProductsController from './controller/products/list';
+import listOrdersController from './controller/orders/list';
+import listCustomersController from './controller/customers/list';
+import statsController from './controller/stats/index';
 
 const PORT = parseInt(process.env.BACKEND_PORT || process.env.PORT, 10);
 
@@ -24,6 +28,10 @@ app.post('/api/webhooks', express.text({ type: '*/*' }), webhooksController());
 app.use('/api/*', express.text({ type: '*/*' }), shopline.validateAuthentication());
 
 app.get('/api/products/create', createProductController);
+app.get('/api/products', listProductsController);
+app.get('/api/orders', listOrdersController);
+app.get('/api/customers', listCustomersController);
+app.get('/api/stats', statsController);
 
 app.use(express.json());
 
