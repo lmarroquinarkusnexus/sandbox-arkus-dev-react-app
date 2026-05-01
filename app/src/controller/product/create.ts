@@ -1,22 +1,21 @@
 import createProductService from '../../service/product/create';
 
-export default async function createProductController(_req, res) {
+export default async function createProductController(req, res) {
   let status = 200;
   let error = null;
   let response;
 
   try {
     const { handle, accessToken } = res.locals.shopline.session;
-    response = await createProductService(handle, accessToken, _req.headers);
+    const productData = typeof req.body === 'string' && req.body.trim() ? JSON.parse(req.body) : req.body;
+    console.log('[products/create] payload:', JSON.stringify(productData));
+    response = await createProductService(handle, accessToken, productData);
+    status = response.status >= 200 && response.status <= 299 ? 200 : 400;
   } catch (e) {
-    console.log(`Failed to process products/create: ${e.message}`);
+    console.error(`[products/create] Error: ${e.message}`);
     status = 500;
     error = e.message;
   }
-  res
-    .status(status)
-    .set({
-      traceid: response.headers.get('traceid')?.split(',')?.[0],
-    })
-    .send({ success: status === 200, error, data: response.data });
+
+  res.status(status).json({ success: status === 200, error, data: response?.data });
 }

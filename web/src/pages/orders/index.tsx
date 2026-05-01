@@ -3,14 +3,15 @@ import Layout from '../../components/Layout';
 import { useAuthenticatedFetch } from '../../hooks/useAuthenticatedFetch';
 import { useAppBridge } from '../../hooks/useAppBridge';
 import { Redirect } from '@shoplinedev/appbridge';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 interface Order {
   id: string | number;
-  order_number?: string | number;
+  name?: string;
   customer?: { first_name?: string; last_name?: string };
-  total_price?: string;
+  current_total_price?: string;
   financial_status?: string;
-  fulfillment_status?: string;
+  fulfillment_status?: string | null;
   created_at?: string;
 }
 
@@ -20,13 +21,23 @@ const TH = ({ children }: { children: string }) => (
   </th>
 );
 
-const statusColor = (s?: string) => {
-  if (!s) return { bg: '#f6f6f7', fg: '#637381' };
+const PAYMENT_LABEL: Record<string, string> = {
+  paid: 'Pagado', unpaid: 'Sin pagar', pending: 'Pendiente',
+  refunded: 'Reembolsado', authorized: 'Autorizado', partially_paid: 'Pago parcial',
+};
+const FULFILLMENT_LABEL: Record<string, string> = {
+  fulfilled: 'Enviado', partial: 'Parcial', restocked: 'Devuelto',
+};
+
+const statusColor = (s?: string | null) => {
+  if (!s || s === 'null') return { bg: '#f6f6f7', fg: '#637381' };
   const map: Record<string, { bg: string; fg: string }> = {
-    paid:       { bg: '#e3f9e5', fg: '#108043' },
-    pending:    { bg: '#fff3e0', fg: '#c05717' },
-    refunded:   { bg: '#fff4f4', fg: '#c0392b' },
-    authorized: { bg: '#f0f4ff', fg: '#3a6cca' },
+    paid:          { bg: '#e3f9e5', fg: '#108043' },
+    pending:       { bg: '#fff3e0', fg: '#c05717' },
+    refunded:      { bg: '#fff4f4', fg: '#c0392b' },
+    authorized:    { bg: '#f0f4ff', fg: '#3a6cca' },
+    unpaid:        { bg: '#fff3e0', fg: '#c05717' },
+    partially_paid:{ bg: '#fff8e0', fg: '#b07d00' },
   };
   return map[s] ?? { bg: '#f6f6f7', fg: '#637381' };
 };
@@ -34,15 +45,28 @@ const statusColor = (s?: string) => {
 export default function Orders() {
   const app = useAppBridge();
   const fetch = useAuthenticatedFetch();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    setLoading(true);
     fetch('/api/orders')
       .then((r) => r.json())
-      .then((d) => setOrders(d?.orders ?? []))
+      .then((d) => {
+        const fetched: Order[] = d?.orders ?? [];
+        const newOrder: Order | undefined = location.state?.newOrder;
+        // Si Shopline aún no tiene la orden en caché, la prependemos localmente
+        if (newOrder && !fetched.find((o) => String(o.id) === String(newOrder.id))) {
+          setOrders([newOrder, ...fetched]);
+        } else {
+          setOrders(fetched);
+        }
+      })
+      .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  }, [location.key]);
 
   const goToAdminOrders = () => Redirect.create(app).ToAdminPage('ORDERS' as any);
 
@@ -55,15 +79,23 @@ export default function Orders() {
             Orders {!loading && <span style={{ color: '#637381', fontSize: 16 }}>({orders.length})</span>}
           </h1>
           <p style={{ margin: '4px 0 0', color: '#637381', fontSize: 13 }}>
-            Fetched from Shopline Admin REST API · limit 50 · status: any
+            Shopline Admin REST API · límite 50 · todos los estados
           </p>
         </div>
-        <button
-          onClick={goToAdminOrders}
-          style={{ background: '#fff', border: '1px solid #c4cdd5', borderRadius: 6, padding: '8px 14px', cursor: 'pointer', fontSize: 13 }}
-        >
-          Open in Shopline Admin →
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            onClick={goToAdminOrders}
+            style={{ background: '#fff', border: '1px solid #c4cdd5', borderRadius: 6, padding: '8px 14px', cursor: 'pointer', fontSize: 13 }}
+          >
+            Ver en Admin →
+          </button>
+          <button
+            onClick={() => navigate('/orders/new')}
+            style={{ background: '#5c6ac4', color: '#fff', border: 'none', borderRadius: 6, padding: '8px 14px', cursor: 'pointer', fontSize: 13 }}
+          >
+            + Nueva Orden
+          </button>
+        </div>
       </div>
 
       {/* Table */}
@@ -85,8 +117,18 @@ export default function Orders() {
             <tbody>
               {orders.length === 0 ? (
                 <tr>
-                  <td colSpan={6} style={{ padding: 32, textAlign: 'center', color: '#637381' }}>
-                    No orders found in this store.
+                  <td colSpan={6} style={{ padding: 40, textAlign: 'center' }}>
+                    <div style={{ color: '#637381', marginBottom: 12 }}>
+                      No hay pedidos en esta tienda aún.
+                    </div>
+                    <p style={{ color: '#8c9099', fontSize: 12, margin: '0 0 14px' }}>
+                      Los pedidos se crean cuando un cliente compra en tu tienda. Puedes crear un pedido de prueba desde el Admin de Shopline.
+                    </p>
+                    <button
+                      onClick={goToAdminOrders}
+                      style={{ background: '#5c6ac4', color: '#fff', border: 'none', borderRadius: 6, padding: '8px 16px', cursor: 'pointer', fontSize: 13 }}>
+                      Ir al Admin de Shopline →
+                    </button>
                   </td>
                 </tr>
               ) : (
@@ -95,7 +137,7 @@ export default function Orders() {
                   return (
                     <tr key={o.id} style={{ borderTop: '1px solid #f1f2f3' }}>
                       <td style={{ padding: '12px 16px', fontWeight: 600, color: '#1a1d23' }}>
-                        #{o.order_number ?? o.id}
+                        {o.name ?? `#${o.id}`}
                       </td>
                       <td style={{ padding: '12px 16px', fontSize: 13 }}>
                         {o.customer
@@ -103,20 +145,22 @@ export default function Orders() {
                           : <span style={{ color: '#637381' }}>Guest</span>}
                       </td>
                       <td style={{ padding: '12px 16px', fontSize: 13, fontWeight: 500 }}>
-                        {o.total_price ?? '—'}
+                        {o.current_total_price ?? '—'}
                       </td>
                       <td style={{ padding: '12px 16px' }}>
-                        {o.financial_status && (
+                        {o.financial_status && o.financial_status !== 'null' && (
                           <span style={{ background: pay.bg, color: pay.fg, borderRadius: 12, padding: '2px 8px', fontSize: 12, fontWeight: 500 }}>
-                            {o.financial_status}
+                            {PAYMENT_LABEL[o.financial_status] ?? o.financial_status}
                           </span>
                         )}
                       </td>
                       <td style={{ padding: '12px 16px', fontSize: 13, color: '#637381' }}>
-                        {o.fulfillment_status ?? 'unfulfilled'}
+                        {(!o.fulfillment_status || o.fulfillment_status === 'null')
+                          ? 'Sin enviar'
+                          : (FULFILLMENT_LABEL[o.fulfillment_status] ?? o.fulfillment_status)}
                       </td>
                       <td style={{ padding: '12px 16px', fontSize: 13, color: '#637381' }}>
-                        {o.created_at ? new Date(o.created_at).toLocaleDateString() : '—'}
+                        {o.created_at ? new Date(o.created_at).toLocaleDateString('es-MX') : '—'}
                       </td>
                     </tr>
                   );

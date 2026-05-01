@@ -1,13 +1,13 @@
 
 appName = "sandbox-arkus-dev-react-app"
 appKey = "20439b05440d122cca7170784059415adf4c6e28"
-appUrl = "https://dreams-jimmy-shepherd-cnet.trycloudflare.com"
+appUrl = "https://emacs-qualified-sounds-dayton.trycloudflare.com"
 appCallbackUrlList = [
-  "https://dreams-jimmy-shepherd-cnet.trycloudflare.com/api/auth/callback"
+  "https://emacs-qualified-sounds-dayton.trycloudflare.com/api/auth/callback"
 ]
 isNewWindow = false
 subPathPrefix = "apps"
 proxyUrl = ""
 
 [access_scopes]
-scopes = "write_products,read_products,read_orders,read_customers"
+scopes = "write_products,read_products,write_orders,read_orders,read_customers,write_customers"

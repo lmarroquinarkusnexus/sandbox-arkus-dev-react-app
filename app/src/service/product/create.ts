@@ -1,33 +1,48 @@
-import fetch from 'node-fetch';
-
 const API_VERSION = 'v20230901';
 
-export default async function createProductService(handle, token, headers = {}) {
-  try {
-    const url = `https://${handle}.myshopline.com/admin/openapi/${API_VERSION}/products/products.json`;
-    const bodyParams = {
-      product: {
-        title: `shopline app test product`,
-      },
-    };
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'User-Agent': headers['user-agent'],
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(bodyParams),
-    });
-    if (!/2[0-9]+/.test(`${response.status}`)) {
-      throw new Error(response.statusText);
-    }
-    const data = await response.json();
-    return {
-      headers: response.headers,
-      data,
-    };
-  } catch (error) {
-    throw error;
+interface ProductData {
+  title: string;
+  body_html?: string;
+  price?: string;
+  inventory_quantity?: number;
+  status?: 'active' | 'draft' | 'archived';
+}
+
+export default async function createProductService(handle: string, token: string, productData: ProductData) {
+  const url = `https://${handle}.myshopline.com/admin/openapi/${API_VERSION}/products/products.json`;
+  const body = {
+    product: {
+      title: productData.title,
+      body_html: productData.body_html ?? '',
+      status: productData.status ?? 'active',
+      variants: [
+        {
+          price: productData.price ?? '0.00',
+          inventory_quantity: productData.inventory_quantity ?? 0,
+        },
+      ],
+    },
+  };
+
+  console.log('[createProductService] POST', url);
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+
+  console.log('[createProductService] status:', response.status);
+
+  const contentType = response.headers.get('content-type') ?? '';
+  if (!contentType.includes('application/json')) {
+    const text = await response.text();
+    throw new Error(`Shopline API HTTP ${response.status} — no JSON. Preview: ${text.slice(0, 300)}`);
   }
+
+  const data = await response.json();
+  return { status: response.status, data };
 }
